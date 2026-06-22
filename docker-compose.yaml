@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: student
+      POSTGRES_PASSWORD: student_pass
+      POSTGRES_DB: chat_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U student -d chat_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: llama-cpp
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/models:ro
+    command:
+      - "-m"
+      - "/models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "-c"
+      - "4096"
+    restart: unless-stopped
+
+  fastapi:
+    build: ./fastapi
+    container_name: gptbot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8672:8672"
+    environment:
+      DB_USER: student
+      DB_PASSWORD: student_pass
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: chat_db
+      LLM_BASE_URL: http://llm:8080/v1
+      PORT: "8672"
+    volumes:
+      - bot_logs:/app/logs
+    restart: unless-stopped
+
+  streamlit:
+    build: ./streamlit
+    container_name: chat-ui
+    depends_on:
+      - fastapi
+    ports:
+      - "8501:8501"
+    environment:
+      FASTAPI_URL: http://fastapi:8672
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  bot_logs:

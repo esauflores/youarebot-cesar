@@ -1,0 +1,13 @@
+[project]
+name = "youarebot-cesar"
+version = "0.1.0"
+description = ""
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = ">=3.12"
+huggingface-hub = ">=0.23"

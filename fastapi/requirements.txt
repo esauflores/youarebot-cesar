@@ -1,0 +1,8 @@
+fastapi
+pydantic
+uvicorn
+loguru
+pydantic-settings
+openai
+httpx
+psycopg2-binary
