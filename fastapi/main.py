@@ -1,13 +1,13 @@
 import uvicorn
 import psycopg2
 import time
-import re
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from uuid import uuid4, UUID
 
 from config import logger, Config
 from models_fast_api import GetMessageRequestModel, GetMessageResponseModel, IncomingMessage, Prediction
 from create_answer import get_response_from_llm
+from model_inference import classify_text
 from database import insert_message, init_db
 
 app = FastAPI()
@@ -51,30 +51,6 @@ async def get_message(body: GetMessageRequestModel):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-# ponytail: heuristic classifier, no ML model. Swap in real model if accuracy matters.
-def classify_text(text: str) -> float:
-    score = 0.3
-    if len(text) > 300:
-        score += 0.15
-    if len(text) < 5:
-        score += 0.05
-    if text and text[0].isalpha() and not text[0].isupper():
-        score += 0.1
-    if re.search(r'\b(however|moreover|furthermore|therefore|consequently)\b', text, re.I):
-        score += 0.15
-    if text.count('.') >= 3 and len(text) > 100:
-        score += 0.1
-    if re.search(r'\b(as an AI|I am an AI|language model)\b', text, re.I):
-        score += 0.4
-    if re.search(r'\b(hmm+|uhh+|uhm+)\b', text, re.I):
-        score -= 0.1
-    if text.rstrip().endswith('.') and len(text) < 40:
-        score -= 0.05
-    if not text.rstrip().endswith('.') and len(text) > 5:
-        score -= 0.05
-    return max(0.0, min(1.0, score))
 
 
 @app.post("/predict", response_model=Prediction)

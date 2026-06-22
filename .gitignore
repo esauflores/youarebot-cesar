@@ -1,4 +1,5 @@
 portforward_key
+data/
 models/
 *.log
 logs/

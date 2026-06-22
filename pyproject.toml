@@ -11,3 +11,10 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.dependencies]
 python = ">=3.12"
 huggingface-hub = ">=0.23"
+kagglehub = "^1.0.2"
+
+[dependency-groups]
+eval = [
+    "nbformat (>=5.10.4,<6.0.0)",
+    "ipykernel (>=7.3.0,<8.0.0)"
+]

@@ -1,11 +1,12 @@
 FROM python:3.12-slim
 
-# ponytail: psycopg2-binary instead of compiling from source, no gcc needed
-
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY requirements-ml.txt .
+RUN pip install --no-cache-dir -r requirements-ml.txt
 
 RUN mkdir -p /app/logs
 COPY . .
