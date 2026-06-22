@@ -1,3 +1,2 @@
 [tools]
-just = "latest"
-poetry = "latest"
+uv = "latest"

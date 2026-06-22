@@ -1,20 +1,25 @@
 [project]
 name = "youarebot-cesar"
 version = "0.1.0"
-description = ""
 requires-python = ">=3.12"
+dependencies = [
+    "huggingface-hub>=0.23",
+    "kagglehub>=1.0",
+]
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
-[tool.poetry.dependencies]
-python = ">=3.12"
-huggingface-hub = ">=0.23"
-kagglehub = "^1.0.2"
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 eval = [
-    "nbformat (>=5.10.4,<6.0.0)",
-    "ipykernel (>=7.3.0,<8.0.0)"
+    "torch>=2.0",
+    "transformers>=4.40",
+    "scikit-learn>=1.5",
+    "nbformat>=5.10",
+    "ipykernel>=7.3",
 ]

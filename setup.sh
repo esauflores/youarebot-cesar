@@ -26,7 +26,7 @@ mkdir -p "$DATA_DIR"
 if [ -z "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
     cd "$SCRIPT_DIR"
     echo "Downloading Kaggle dataset '$COMPETITION'..."
-    poetry run python -c "
+    uv run python -c "
 import kagglehub, shutil, os
 path = kagglehub.competition_download('$COMPETITION')
 for f in os.listdir(path):
