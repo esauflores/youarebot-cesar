@@ -1,6 +1,7 @@
 portforward_key
-data/
 models/
+checkpoints/
+mlruns/
 *.log
 logs/
 __pycache__/
