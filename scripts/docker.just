@@ -2,28 +2,28 @@
 
 # start everything
 up:
-    docker compose up --build
+    docker compose -f compose.yml up --build
 
 # start in background
 upd:
-    docker compose up --build -d
+    docker compose -f compose.yml up --build -d
 
 # stop everything
 down:
-    docker compose down
+    docker compose -f compose.yml down
 
 # stop and remove volumes
 nuke:
-    docker compose down -v
+    docker compose -f compose.yml down -v
 
 # rebuild images only
 build:
-    docker compose build
+    docker compose -f compose.yml build
 
 # view logs
 logs:
-    docker compose logs -f
+    docker compose -f compose.yml logs -f
 
 # check service status
 ps:
-    docker compose ps
+    docker compose -f compose.yml ps
