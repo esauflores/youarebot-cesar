@@ -41,7 +41,10 @@ def init_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    try:
+        init_db()
+    except Exception:
+        pass
     yield
 
 app = FastAPI(title="youarebot-orchestrator", lifespan=lifespan)
@@ -73,7 +76,13 @@ async def predict(request: Request):
     except Exception:
         pass
 
-    return JSONResponse({"is_bot_probability": prob})
+    return JSONResponse({
+        "id": str(uuid4()),
+        "message_id": str(uuid4()),
+        "dialog_id": str(uuid4()),
+        "participant_index": 0,
+        "is_bot_probability": prob,
+    })
 
 
 @app.post("/get_message")

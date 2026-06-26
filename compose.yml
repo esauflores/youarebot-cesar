@@ -1,40 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
     environment:
       POSTGRES_USER: student
       POSTGRES_PASSWORD: student_pass
       POSTGRES_DB: chat_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U student -d chat_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
 
   classifier:
     build: ./classifier
-    container_name: classifier
     ports:
       - "8000:8000"
-    restart: unless-stopped
-
-  llm:
-    build: ./llm
-    container_name: llama-cpp
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./models:/models:ro
-    restart: unless-stopped
 
   orchestrator:
     build: ./orchestrator
-    container_name: orchestrator
     depends_on:
       - classifier
       - llm
@@ -44,18 +22,17 @@ services:
       CLASSIFIER_URL: http://classifier:8000
       LLM_URL: http://llm:8080
       DATABASE_URL: postgresql://student:student_pass@postgres:5432/chat_db
-    restart: unless-stopped
+
+  llm:
+    build: ./llm
+    ports:
+      - "8080:8080"
 
   streamlit:
     build: ./streamlit
-    container_name: chat-ui
     depends_on:
       - orchestrator
     ports:
       - "8501:8501"
     environment:
       ORCHESTRATOR_URL: http://orchestrator:8672
-    restart: unless-stopped
-
-volumes:
-  postgres_data:

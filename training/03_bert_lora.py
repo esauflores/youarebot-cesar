@@ -24,7 +24,7 @@ from sklearn.model_selection import train_test_split
 DATA = Path(__file__).parent / "data"
 MODEL_NAME = "bert-base-uncased"
 BATCH_SIZE = 32
-EPOCHS = 6
+EPOCHS = 10
 LR = 5e-4
 VAL_SPLIT = 0.1
 
