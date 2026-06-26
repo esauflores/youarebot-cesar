@@ -16,6 +16,13 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  classifier:
+    build: ./classifier
+    container_name: classifier
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: llama-cpp
@@ -25,7 +32,7 @@ services:
       - ./models:/models:ro
     command:
       - "-m"
-      - "/models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+      - "/models/Qwen3.5-0.8B-Q4_K_M.gguf"
       - "--host"
       - "0.0.0.0"
       - "--port"
@@ -34,37 +41,30 @@ services:
       - "4096"
     restart: unless-stopped
 
-  fastapi:
-    build: ./fastapi
-    container_name: gptbot
+  orchestrator:
+    build: ./orchestrator
+    container_name: orchestrator
     depends_on:
-      postgres:
-        condition: service_healthy
+      - classifier
+      - llm
     ports:
       - "8672:8672"
     environment:
-      DB_USER: student
-      DB_PASSWORD: student_pass
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_NAME: chat_db
-      LLM_BASE_URL: http://llm:8080/v1
-      PORT: "8672"
-    volumes:
-      - bot_logs:/app/logs
+      CLASSIFIER_URL: http://classifier:8000
+      LLM_URL: http://llm:8080
+      DATABASE_URL: postgresql://student:student_pass@postgres:5432/chat_db
     restart: unless-stopped
 
   streamlit:
     build: ./streamlit
     container_name: chat-ui
     depends_on:
-      - fastapi
+      - orchestrator
     ports:
       - "8501:8501"
     environment:
-      FASTAPI_URL: http://fastapi:8672
+      ORCHESTRATOR_URL: http://orchestrator:8672
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  bot_logs:

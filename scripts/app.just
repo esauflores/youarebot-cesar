@@ -1,4 +1,4 @@
-# app — tunnel + proxy
+# app — UI + tunnel
 
 # open chat UI
 chat:

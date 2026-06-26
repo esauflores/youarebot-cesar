@@ -1,6 +1,6 @@
 # %% [markdown]
-# Experiment 2: BERT + LoRA Fine-Tune
-# LoRA adapters on BERT-base — minimize log loss
+# Experiment 4: ModernBERT + DoRA
+# DoRA on ModernBERT-base — minimize log loss
 # Run `build_features.py` first
 
 # %%
@@ -57,8 +57,8 @@ X_tr, X_val, y_tr, y_val = train_test_split(
     samples, labels, test_size=VAL_SPLIT, stratify=labels, random_state=42
 )
 
-train_enc = tokenizer(X_tr, truncation=True, padding=True, max_length=512)
-val_enc = tokenizer(X_val, truncation=True, padding=True, max_length=512)
+train_enc = tokenizer(X_tr, truncation=True, padding=True, max_length=256)
+val_enc = tokenizer(X_val, truncation=True, padding=True, max_length=256)
 
 class BotDataset(Dataset):
     def __init__(self, encodings, labels):
@@ -79,19 +79,21 @@ print(f"Train: {len(train_ds)}, Val: {len(val_ds)}")
 ## 3. Train with LoRA + MLflow
 
 # %%
-with     mlflow.start_run(run_name="modernbert-lora-finetune"):
+with mlflow.start_run(run_name="modernbert-lora-finetune"):
     mlflow.log_params({
         "model": MODEL_NAME,
         "approach": "LoRA-finetune",
         "lora_r": LORA_R,
         "lora_alpha": LORA_ALPHA,
         "lora_dropout": LORA_DROPOUT,
+        "lora_target_modules": ["Wqkv", "Wo"],
+        "lora_modules_to_save": ["classifier"],
         "learning_rate": LR,
         "batch_size": BATCH_SIZE,
         "epochs": EPOCHS,
         "val_split": VAL_SPLIT,
     })
-    mlflow.set_tag("notes", "LoRA on BERT-base, dialog context with speaker markers + numeric features.")
+    mlflow.set_tag("notes", "LoRA on ModernBERT-base, dialog context + numeric features.")
 
     base_model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
     lora_config = LoraConfig(
@@ -118,7 +120,8 @@ with     mlflow.start_run(run_name="modernbert-lora-finetune"):
         metric_for_best_model="eval_log_loss",
         greater_is_better=False,
         fp16=True,
-        report_to="none",
+        report_to="mlflow",
+        dataloader_num_workers=4,
     )
 
     def compute_metrics(eval_pred):
@@ -145,6 +148,15 @@ with     mlflow.start_run(run_name="modernbert-lora-finetune"):
     # log best metrics
     best = trainer.state.best_metric or 0
     mlflow.log_metric("best_eval_log_loss", best)
+
+    preds = trainer.predict(val_ds)
+    final_probs = torch.nn.functional.softmax(torch.tensor(preds.predictions), dim=-1)[:, 1].numpy()
+    final_preds = preds.predictions.argmax(-1)
+    mlflow.log_metrics({
+        "log_loss": log_loss(y_val, final_probs),
+        "accuracy": accuracy_score(y_val, final_preds),
+        "f1": f1_score(y_val, final_preds),
+    })
 
     # log model
     # save via trainer (avoids accelerator pickle issue)
@@ -176,7 +188,7 @@ with open(DATA / "clean_test.csv") as f:
         test_ids.append(r["ID"])
 
 print(f"Tokenizing {len(test_texts)} test participants...")
-test_enc = tokenizer(test_texts, truncation=True, padding=True, max_length=512, return_tensors="pt")
+test_enc = tokenizer(test_texts, truncation=True, padding=True, max_length=256, return_tensors="pt")
 test_ds = BotDataset(test_enc, [0] * len(test_texts))
 
 trainer.compute_metrics = None

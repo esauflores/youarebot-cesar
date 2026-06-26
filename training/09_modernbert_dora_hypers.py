@@ -1,11 +1,12 @@
 # %% [markdown]
-# Experiment 3: BERT + DoRA
-# DoRA on BERT-base — minimize log loss
+# Experiment 6: ModernBERT + DoRA (no features)
+# DoRA on ModernBERT-base, dialog text only — minimize log loss
 # Run `build_features.py` first
 
 # %%
 import csv
 from pathlib import Path
+import json
 import tempfile, shutil
 import torch
 import mlflow
@@ -22,27 +23,38 @@ from sklearn.metrics import classification_report, accuracy_score, f1_score, log
 from sklearn.model_selection import train_test_split
 
 DATA = Path(__file__).parent / "data"
-MODEL_NAME = "bert-base-uncased"
+MODEL_NAME = "answerdotai/ModernBERT-base"
 BATCH_SIZE = 32
-EPOCHS = 6
-LR = 5e-4
+EPOCHS = 10
+LR = 7e-4
 VAL_SPLIT = 0.1
 
 # LoRA config
 LORA_R = 8
 LORA_ALPHA = 16
-LORA_DROPOUT = 0.1
+LORA_DROPOUT = 0.05
 
 mlflow.set_experiment("youarebot-v2")
 
 # %% [markdown]
-## 1. Load clean data
+## 1. Load raw data (no feature engineering)
 
 # %%
+with open(DATA / "train.json") as f:
+    dialogs = json.load(f)
+with open(DATA / "ytrain.csv") as f:
+    rows = list(csv.DictReader(f))
+
+def build_dialog(msgs, target_idx):
+    """Raw dialog with <self>/<other> markers — no numeric prefix."""
+    tag = lambda m: "<self>" if m["participant_index"] == target_idx else "<other>"
+    return " [SEP] ".join(f"{tag(m)} {m['text']}" for m in msgs)
+
 samples, labels = [], []
-with open(DATA / "clean_train.csv") as f:
-    for r in csv.DictReader(f):
-        samples.append(r["text_with_features"])
+for r in rows:
+    did, idx = r["dialog_id"], int(r["participant_index"])
+    if did in dialogs:
+        samples.append(build_dialog(dialogs[did], idx))
         labels.append(int(r["is_bot"]))
 
 print(f"{len(samples)} participants — Bot: {sum(labels)}, Human: {len(labels)-sum(labels)}")
@@ -79,21 +91,26 @@ print(f"Train: {len(train_ds)}, Val: {len(val_ds)}")
 ## 3. Train with LoRA + MLflow
 
 # %%
-with mlflow.start_run(run_name="bert-lora-finetune"):
+with mlflow.start_run(run_name="modernbert-dora-hypers"):
     mlflow.log_params({
         "model": MODEL_NAME,
-        "approach": "LoRA-finetune",
+        "approach": "DoRA-finetune",
+        "input": "dialog_text_only_no_numeric",
         "lora_r": LORA_R,
         "lora_alpha": LORA_ALPHA,
         "lora_dropout": LORA_DROPOUT,
-        "lora_target_modules": ["query", "key", "value"],
-        "lora_modules_to_save": ["classifier", "pooler"],
+        "lora_target_modules": ["Wqkv", "Wo"],
+        "lora_modules_to_save": ["classifier"],
         "learning_rate": LR,
         "batch_size": BATCH_SIZE,
         "epochs": EPOCHS,
         "val_split": VAL_SPLIT,
+        "warmup_ratio": 0.1,
+        "lr_scheduler": "cosine",
+        "weight_decay": 0.01,
+        "label_smoothing": 0.05,
     })
-    mlflow.set_tag("notes", "LoRA on BERT-base, dialog context + numeric features.")
+    mlflow.set_tag("notes", "DoRA on ModernBERT-base, higher LR 7e-4, lower dropout 0.05, dialog text only.")
 
     base_model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
     lora_config = LoraConfig(
@@ -101,8 +118,9 @@ with mlflow.start_run(run_name="bert-lora-finetune"):
         r=LORA_R,
         lora_alpha=LORA_ALPHA,
         lora_dropout=LORA_DROPOUT,
-        target_modules=["query", "key", "value"],
-        modules_to_save=["classifier", "pooler"],
+        use_dora=True,
+        target_modules=["Wqkv", "Wo"],
+        modules_to_save=["classifier"],
     )
     model = get_peft_model(base_model, lora_config)
     model.print_trainable_parameters()
@@ -121,6 +139,10 @@ with mlflow.start_run(run_name="bert-lora-finetune"):
         greater_is_better=False,
         fp16=True,
         report_to="mlflow",
+        warmup_ratio=0.1,
+        lr_scheduler_type="cosine",
+        weight_decay=0.01,
+        label_smoothing_factor=0.05,
         dataloader_num_workers=4,
     )
 
@@ -181,10 +203,16 @@ print(f"Accuracy: {accuracy_score(y_true, y_pred):.4f}")
 ## 5. Generate submission
 
 # %%
+with open(DATA / "test.json") as f:
+    test_dialogs = json.load(f)
+with open(DATA / "ytest.csv") as f:
+    test_rows = list(csv.DictReader(f))
+
 test_texts, test_ids = [], []
-with open(DATA / "clean_test.csv") as f:
-    for r in csv.DictReader(f):
-        test_texts.append(r["text_with_features"])
+for r in test_rows:
+    did, idx = r["dialog_id"], int(r["participant_index"])
+    if did in test_dialogs:
+        test_texts.append(build_dialog(test_dialogs[did], idx))
         test_ids.append(r["ID"])
 
 print(f"Tokenizing {len(test_texts)} test participants...")

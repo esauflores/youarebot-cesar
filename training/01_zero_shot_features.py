@@ -52,6 +52,7 @@ print("Ready.")
 with mlflow.start_run(run_name="zero-shot-features"):
     mlflow.log_param("model", MODEL_NAME)
     mlflow.log_param("approach", "zero-shot-features")
+    mlflow.log_param("threshold", 0.5)
     mlflow.log_param("input", "dialog_context_with_features")
     mlflow.set_tag("notes", "Zero-shot on full dialog context with <self>/<other> markers + numeric features.")
 

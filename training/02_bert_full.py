@@ -51,8 +51,8 @@ X_tr, X_val, y_tr, y_val = train_test_split(
     samples, labels, test_size=VAL_SPLIT, stratify=labels, random_state=42
 )
 
-train_enc = tokenizer(X_tr, truncation=True, padding=True, max_length=512)
-val_enc = tokenizer(X_val, truncation=True, padding=True, max_length=512)
+train_enc = tokenizer(X_tr, truncation=True, padding=True, max_length=256)
+val_enc = tokenizer(X_val, truncation=True, padding=True, max_length=256)
 
 class BotDataset(Dataset):
     def __init__(self, encodings, labels):
@@ -99,7 +99,8 @@ with mlflow.start_run(run_name="bert-full-finetune"):
         metric_for_best_model="eval_log_loss",
         greater_is_better=False,
         fp16=True,
-        report_to="none",
+        report_to="mlflow",
+        dataloader_num_workers=4,
     )
 
     def compute_metrics(eval_pred):
@@ -125,6 +126,15 @@ with mlflow.start_run(run_name="bert-full-finetune"):
 
     best = trainer.state.best_metric or 0
     mlflow.log_metric("best_eval_log_loss", best)
+
+    preds = trainer.predict(val_ds)
+    final_probs = torch.nn.functional.softmax(torch.tensor(preds.predictions), dim=-1)[:, 1].numpy()
+    final_preds = preds.predictions.argmax(-1)
+    mlflow.log_metrics({
+        "log_loss": log_loss(y_val, final_probs),
+        "accuracy": accuracy_score(y_val, final_preds),
+        "f1": f1_score(y_val, final_preds),
+    })
 
     tmp = tempfile.mkdtemp()
     trainer.save_model(tmp)
@@ -154,7 +164,7 @@ with open(DATA / "clean_test.csv") as f:
         test_ids.append(r["ID"])
 
 print(f"Tokenizing {len(test_texts)} test participants...")
-test_enc = tokenizer(test_texts, truncation=True, padding=True, max_length=512, return_tensors="pt")
+test_enc = tokenizer(test_texts, truncation=True, padding=True, max_length=256, return_tensors="pt")
 test_ds = BotDataset(test_enc, [0] * len(test_texts))
 
 trainer.compute_metrics = None

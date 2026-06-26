@@ -1,0 +1,24 @@
+app = "youarebot-cesar"
+
+[build]
+  [build.args]
+  DOCKERFILE = "orchestrator/Dockerfile"
+
+[experimental]
+  cmd = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+  entrypoint = ["python3"]
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]

@@ -1,6 +1,6 @@
 # %% [markdown]
-# Experiment 3: BERT + DoRA
-# DoRA on BERT-base — minimize log loss
+# Experiment 8: ModernBERT + DoRA + PiSSA
+# DoRA on ModernBERT-base with PiSSA init — minimize log loss
 # Run `build_features.py` first
 
 # %%
@@ -22,9 +22,9 @@ from sklearn.metrics import classification_report, accuracy_score, f1_score, log
 from sklearn.model_selection import train_test_split
 
 DATA = Path(__file__).parent / "data"
-MODEL_NAME = "bert-base-uncased"
+MODEL_NAME = "answerdotai/ModernBERT-base"
 BATCH_SIZE = 32
-EPOCHS = 6
+EPOCHS = 10
 LR = 5e-4
 VAL_SPLIT = 0.1
 
@@ -79,21 +79,23 @@ print(f"Train: {len(train_ds)}, Val: {len(val_ds)}")
 ## 3. Train with LoRA + MLflow
 
 # %%
-with mlflow.start_run(run_name="bert-lora-finetune"):
+with mlflow.start_run(run_name="modernbert-dora-pissa-feats"):
     mlflow.log_params({
         "model": MODEL_NAME,
-        "approach": "LoRA-finetune",
+        "approach": "DoRA+PiSSA-finetune",
+        "input": "dialog_text_with_numeric_features",
         "lora_r": LORA_R,
         "lora_alpha": LORA_ALPHA,
         "lora_dropout": LORA_DROPOUT,
-        "lora_target_modules": ["query", "key", "value"],
-        "lora_modules_to_save": ["classifier", "pooler"],
+        "lora_init": "pissa",
+        "lora_target_modules": ["Wqkv", "Wo"],
+        "lora_modules_to_save": ["classifier"],
         "learning_rate": LR,
         "batch_size": BATCH_SIZE,
         "epochs": EPOCHS,
         "val_split": VAL_SPLIT,
     })
-    mlflow.set_tag("notes", "LoRA on BERT-base, dialog context + numeric features.")
+    mlflow.set_tag("notes", "DoRA + PiSSA init on ModernBERT-base, dialog context + numeric features.")
 
     base_model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
     lora_config = LoraConfig(
@@ -101,8 +103,10 @@ with mlflow.start_run(run_name="bert-lora-finetune"):
         r=LORA_R,
         lora_alpha=LORA_ALPHA,
         lora_dropout=LORA_DROPOUT,
-        target_modules=["query", "key", "value"],
-        modules_to_save=["classifier", "pooler"],
+        use_dora=True,
+        init_lora_weights="pissa",
+        target_modules=["Wqkv", "Wo"],
+        modules_to_save=["classifier"],
     )
     model = get_peft_model(base_model, lora_config)
     model.print_trainable_parameters()
